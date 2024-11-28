@@ -1,0 +1,57 @@
+import torchaudio
+from speechbrain.inference.TTS import FastSpeech2InternalAlignment
+from speechbrain.inference.vocoders import HIFIGAN
+
+# Initialize TTS and Vocoder
+fastspeech2 = FastSpeech2InternalAlignment.from_hparams(
+    source="speechbrain/tts-fastspeech2-internal-alignment-ljspeech", 
+    savedir="pretrained_models/tts-fastspeech2-internal-alignment-ljspeech"
+)
+hifi_gan = HIFIGAN.from_hparams(
+    source="speechbrain/tts-hifigan-ljspeech", 
+    savedir="pretrained_models/tts-hifigan-ljspeech"
+)
+
+# Define function to generate speech stimuli
+def generate_speech_variation(text, pitch_rate, energy_rate, output_filename):
+    """
+    Generate a speech variation with specified pitch and energy adjustments.
+
+    Args:
+        text (str): Input text to synthesize.
+        pitch_rate (float): Multiplier for pitch (intonation control).
+        energy_rate (float): Multiplier for energy (stress emphasis).
+        output_filename (str): Filepath for saving the generated audio.
+    """
+    mel_output, durations, pitch, energy = fastspeech2.encode_text(
+        [text],
+        pace=1.0,             # Keep pace constant
+        pitch_rate=pitch_rate, # Adjust pitch for intonation
+        energy_rate=energy_rate  # Adjust energy for stress
+    )
+    waveforms = hifi_gan.decode_batch(mel_output)
+    torchaudio.save(output_filename, waveforms.squeeze(1), 22050)
+    print(f"Saved: {output_filename}")
+
+# Define variations
+variations = [
+    # Correct Stress, Falling Intonation
+    ("Although she hesitated to purchase the expensive textbook, she ultimately decided to choose the hardcover edition.", 1.0, 1.2, "correct_stress_falling_complex.wav"),
+    
+    # Correct Stress, Rising Intonation
+    ("Although she hesitated to purchase the expensive textbook, she ultimately decided to choose the hardcover edition?", 1.5, 1.2, "correct_stress_rising_complex.wav"),
+    
+    # Incorrect Stress, Falling Intonation
+    ("Although she hesitated to purchase the expensive textbook, she ultimately decided to choose the expensive textbook.", 1.0, 0.8, "incorrect_stress_falling_complex.wav"),
+    
+    # Incorrect Stress, Rising Intonation
+    ("Although she hesitated to purchase the expensive textbook, she ultimately decided to choose the expensive textbook?", 1.5, 0.8, "incorrect_stress_rising_complex.wav"),
+    
+    # Correct Stress, Falling Intonation (Simple Sentence)
+    ("She hesitated. She then decided to choose the hardcover edition.", 1.0, 1.2, "correct_stress_falling_simple.wav"),
+]
+
+# Generate stimuli for all variations
+for text, pitch, energy, filename in variations:
+    generate_speech_variation(text, pitch, energy, filename)
+
