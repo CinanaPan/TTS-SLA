@@ -1,0 +1,104 @@
+import tkinter as tk
+from tkinter import messagebox
+import pygame
+import time
+import csv
+
+# Initialize pygame for audio playback
+pygame.mixer.init()
+
+# Define the stimuli and questions
+stimuli = [
+    {"audio": "correct_stress_falling_complex.wav", 
+     "question": "What type of book did she choose?", 
+     "answers": ["A notebook", "A hardcover book", "An e-book"], 
+     "correct": 1},
+    
+    {"audio": "incorrect_stress_rising_complex.wav", 
+     "question": "What does the rising intonation suggest?", 
+     "answers": ["Uncertainty", "Certainty", "No effect"], 
+     "correct": 0},
+]
+
+# Save data to CSV
+def save_data(data, filename="responses.csv"):
+    with open(filename, "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(data)
+
+# Play the audio stimulus
+def play_audio(audio_file):
+    pygame.mixer.music.load(audio_file)
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        time.sleep(0.1)
+
+# Run the experiment for a single stimulus
+def run_stimulus(index):
+    stimulus = stimuli[index]
+    start_time = time.time()
+
+    # Play the audio stimulus
+    play_audio(stimulus["audio"])
+
+    # Display the question
+    question_label.config(text=stimulus["question"])
+    for i, button in enumerate(answer_buttons):
+        button.config(text=stimulus["answers"][i], command=lambda i=i: record_response(index, i, start_time))
+
+# Record the response
+def record_response(index, response, start_time):
+    stimulus = stimuli[index]
+    end_time = time.time()
+    response_time = round(end_time - start_time, 2)
+    is_correct = 1 if response == stimulus["correct"] else 0
+
+    # Save the response data
+    save_data([stimulus["audio"], stimulus["question"], stimulus["answers"][response], is_correct, response_time])
+
+    # Ask for cognitive load feedback
+    ask_cognitive_load(index)
+
+# Collect cognitive load feedback
+def ask_cognitive_load(index):
+    def submit_feedback():
+        feedback = feedback_var.get()
+        save_data(["Cognitive Load", stimuli[index]["audio"], feedback])
+        feedback_window.destroy()
+        next_stimulus(index)
+
+    feedback_window = tk.Toplevel(root)
+    feedback_window.title("Cognitive Load Feedback")
+    tk.Label(feedback_window, text="Rate the difficulty of this task (1 = Easy, 7 = Difficult):").pack()
+    feedback_var = tk.IntVar()
+    feedback_var.set(1)
+    tk.Scale(feedback_window, from_=1, to=7, orient="horizontal", variable=feedback_var).pack()
+    tk.Button(feedback_window, text="Submit", command=submit_feedback).pack()
+
+# Move to the next stimulus or end the experiment
+def next_stimulus(index):
+    if index + 1 < len(stimuli):
+        run_stimulus(index + 1)
+    else:
+        messagebox.showinfo("Experiment Complete", "Thank you for participating!")
+        root.destroy()
+
+# GUI Setup
+root = tk.Tk()
+root.title("L2 Prosody Experiment")
+
+# Question display
+question_label = tk.Label(root, text="Press Start to Begin", font=("Arial", 16))
+question_label.pack(pady=20)
+
+# Answer buttons
+answer_buttons = [tk.Button(root, text=f"Option {i+1}", font=("Arial", 14)) for i in range(3)]
+for button in answer_buttons:
+    button.pack(pady=5)
+
+# Start button
+start_button = tk.Button(root, text="Start", font=("Arial", 16), command=lambda: run_stimulus(0))
+start_button.pack(pady=20)
+
+# Run the GUI
+root.mainloop()
