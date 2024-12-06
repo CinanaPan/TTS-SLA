@@ -1,0 +1,78 @@
+import tkinter as tk
+from tkinter import messagebox
+import pygame
+import time
+import csv
+
+pygame.mixer.init()
+
+# Define stimuli with levels of difficulty
+stimuli = [
+    {"audio": "level1_simple.wav", "question": "Which word is emphasized?", 
+     "answers": ["Book", "Expensive", "Is"], "correct": 1, "level": 1},
+    {"audio": "level2_medium.wav", "question": "What is the intonation pattern?", 
+     "answers": ["Rising", "Falling", "Flat"], "correct": 0, "level": 2},
+    {"audio": "level3_complex.wav", "question": "Which phrase has emphasis?", 
+     "answers": ["Hardcover book", "Is on the table", "The book"], "correct": 0, "level": 3},
+]
+
+# Save data to CSV
+def save_data(data, filename="responses.csv"):
+    with open(filename, "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(data)
+
+# Adjust difficulty
+def adjust_difficulty(current_level, correct):
+    if correct:
+        return min(current_level + 1, 3)  # Move to next level
+    else:
+        return max(current_level - 1, 1)  # Stay or reduce level
+
+# Play the audio stimulus
+def play_audio(audio_file):
+    pygame.mixer.music.load(audio_file)
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        time.sleep(0.1)
+
+# Run the stimulus
+def run_stimulus(index, level):
+    stimulus = [s for s in stimuli if s["level"] == level][index]
+    start_time = time.time()
+
+    play_audio(stimulus["audio"])
+    question_label.config(text=stimulus["question"])
+    for i, button in enumerate(answer_buttons):
+        button.config(text=stimulus["answers"][i], command=lambda i=i: record_response(index, level, i, start_time))
+
+# Record the response
+def record_response(index, level, response, start_time):
+    stimulus = [s for s in stimuli if s["level"] == level][index]
+    end_time = time.time()
+    response_time = round(end_time - start_time, 2)
+    is_correct = 1 if response == stimulus["correct"] else 0
+
+    save_data([stimulus["audio"], stimulus["question"], stimulus["answers"][response], is_correct, response_time])
+
+    # Adjust difficulty and give feedback
+    new_level = adjust_difficulty(level, is_correct)
+    feedback = "Correct!" if is_correct else "Try again!"
+    messagebox.showinfo("Feedback", feedback)
+    run_stimulus(index, new_level)
+
+# GUI Setup
+root = tk.Tk()
+root.title("Adaptive Prosody Learning")
+
+question_label = tk.Label(root, text="Press Start to Begin", font=("Arial", 16))
+question_label.pack(pady=20)
+
+answer_buttons = [tk.Button(root, text=f"Option {i+1}", font=("Arial", 14)) for i in range(3)]
+for button in answer_buttons:
+    button.pack(pady=5)
+
+start_button = tk.Button(root, text="Start", font=("Arial", 16), command=lambda: run_stimulus(0, 1))
+start_button.pack(pady=20)
+
+root.mainloop()
